@@ -1,0 +1,113 @@
+variables:
+  # GCE account related
+  project_id: notnoopci-prototype
+  account_file: ""
+
+  # metadata for tagging
+  circle_build_url: '{{ env "CIRCLE_BUILD_URL"}}'
+  circle_job_name: '{{ env "CIRCLE_JOB" }}'
+  circle_sha: '{{ env "CIRCLE_SHA1" }}'
+  circle_hostname: '{{ split (env "CIRCLE_BUILD_URL") "/" 2 }}'
+  circle_workflow_id: '{{ env "CIRCLE_WORKFLOW_ID" }}'
+  gce_region: '{{ split (user "gce_zone") "-" 0 }}'
+
+builders:
+- type: googlecompute
+  image_name: ubuntu-2004-focal-{{timestamp}}
+  image_family: ubuntu-2004
+  # using `source_image` instead of `source_image_family` because newest image at the time of change was breaking
+  # circleci user permissions
+  source_image: ubuntu-2004-focal-v20200729
+  disk_size: 10
+
+  project_id: '{{ user "project_id" }}'
+  account_file: '{{ user "account_file" }}'
+  zone: '{{ user "gce_zone" }}'
+  subnetwork: default
+  ssh_username: circleci
+
+  # metadata:
+    # disable sshguard before we create the image
+    # to avoid risking getting packer blacklisted
+    # while it's attempting to poll for ssh status
+    #
+    # this is commented out for the time being, as
+    # there is an intermittent issue that
+    # the startup script never stops
+    # startup-script: |
+      # sudo apt-get purge -y sshguard
+
+  image_labels:
+    region: '{{ user "gce_region" }}'
+    circle_hostname: '{{ user "circle_hostname" | clean_image_name }}'
+    circle_workflow_id: '{{ user "circle_workflow_id" | clean_image_name }}'
+    circle_job_name: '{{ user "circle_job_name" | clean_image_name }}'
+    circle_sha: '{{ user "circle_sha" | clean_image_name }}'
+    monorepo_content_sha: '{{ user "monorepo_content_sha" | clean_image_name }}'
+
+- type: amazon-ebs
+  access_key: ""
+  secret_key: ""
+  region: '{{ user "ami_region" }}'
+  source_ami_filter:
+    filters:
+      virtualization-type: "hvm"
+      root-device-type: "ebs"
+      name: "ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"
+    owners: ["099720109477"]
+    most_recent: true
+  instance_type: "t3a.medium"
+  ami_name: "ubuntu-2004-vm-circleci-classic-{{timestamp}}"
+  ssh_username: "circleci"
+  ami_groups: "all"
+  launch_block_device_mappings:
+    - device_name: "/dev/sda1"
+      volume_size: 10
+      volume_type: "gp2"
+      delete_on_termination: true
+  user_data: |
+    #cloud-config
+    system_info:
+      default_user:
+        name: circleci
+  tags:
+    circle_build_url: '{{ user "circle_build_url" }}'
+    circle_job_name: '{{ user "circle_job_name" }}'
+    circle_sha: '{{ user "circle_sha" }}'
+    monorepo_content_sha: '{{ user "monorepo_content_sha" }}'
+  run_tags:
+    circle_build_url: '{{ user "circle_build_url" }}'
+  run_volume_tags:
+    circle_build_url: '{{ user "circle_build_url" }}'
+
+provisioners:
+- type: shell
+  inline:
+  - sleep 30
+  - mkdir -p /tmp/circleci-provisioner
+
+- type: file
+  source: "./ubuntu-20.04/"
+  destination: "/tmp/circleci-provisioner"
+
+- type: shell
+  inline: ["cd /tmp/circleci-provisioner && sudo su root -c './provision.sh'"]
+
+- type: shell
+  inline: ["sudo rm -rf /opt/circleci-provision-scripts/"]
+
+# clean up
+- type: shell
+  inline:
+  - |
+    set -ex
+
+    # disable autoupdates on boot
+    # these can disturb and slow boot behavior
+    # and we aim to finalize image
+    sudo apt-get purge sshguard
+    sudo sed -i -e '/APT::Periodic::Update-Package-Lists/g' /etc/apt/apt.conf.d/10periodic
+    echo 'APT::Periodic::Unattended-Upgrade "0";' | sudo tee -a /etc/apt/apt.conf.d/10periodic
+    sudo rm -rf ~/.ssh/authorized_keys /tmp/circleci-provisioner
+
+    echo yay it finished
