@@ -123,7 +123,7 @@ library:
 jobs:
   gc_old_ec2_instances:
     docker:
-      - image: circleci/python:3.7
+      - image: cimg/python:3.7
     steps:
       - run:
           name: check that it should work for AWS
