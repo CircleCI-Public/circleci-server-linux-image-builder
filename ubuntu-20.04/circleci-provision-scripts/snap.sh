@@ -10,7 +10,10 @@ function install_snap() {
 
 	# Pre-install the two most recent base snaps. Most snaps will need at least
 	# one of these in order to run. These are also used when building snaps.
-	sudo snap install core18 core20
+	if ! sudo snap list core18 || ! sudo snap list core20
+	then
+		sudo snap install core18 core20
+	fi
 
 	# Install snapcraft, which is the tool used to build/package snaps.
 	sudo snap install --classic snapcraft
