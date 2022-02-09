@@ -36,7 +36,7 @@ function install_maven() {
     echo ">>> Installing Maven $MAVEN_VERSION"
 
     # Install Maven
-    curl -sSL -o /tmp/maven.tar.gz http://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz
+    curl -sSL -o /tmp/maven.tar.gz https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz
     tar -xz -C /usr/local -f /tmp/maven.tar.gz
     ln -sf /usr/local/apache-maven-${MAVEN_VERSION} /usr/local/apache-maven
     rm -rf /tmp/maven.tar.gz
