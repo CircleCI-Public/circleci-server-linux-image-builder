@@ -4,7 +4,7 @@ version: 2
 library:
   build_image: &build_image
     docker:
-      - image: hashicorp/packer:1.4.5
+      - image: hashicorp/packer:1.7.10
     steps:
       - run:
           name: Determine which platform we use
@@ -22,7 +22,7 @@ library:
             fi
       - checkout
       - run: apk update
-      - run: apk add --no-progress python3 curl jq
+      - run: apk add --no-progress python3 curl jq py3-pip
       - run: pip3 install awscli pyyaml
       - run:
           name: install and configure gcloud sdk as needed
